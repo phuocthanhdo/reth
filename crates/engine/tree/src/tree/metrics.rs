@@ -79,39 +79,45 @@ impl EngineApiMetrics {
         let f = || {
             executor.apply_pre_execution_changes()?;
             for tx in transactions {
-                let tx = tx?;
-                let span =
-                    debug_span!(target: "engine::tree", "execute tx", tx_hash=?tx.tx().tx_hash());
-                let enter = span.entered();
-                trace!(target: "engine::tree", "Executing transaction");
-                let gas_used = executor.execute_transaction(tx)?;
+                // let tx = tx?;
+                // let span =
+                //     debug_span!(target: "engine::tree", "execute tx", tx_hash=?tx.tx().tx_hash());
+                // let enter = span.entered();
+                // trace!(target: "engine::tree", "Executing transaction");
+                let _gas_used = executor.execute_transaction(tx?)?;
 
                 // record the tx gas used
-                enter.record("gas_used", gas_used);
+                // enter.record("gas_used", gas_used);
             }
             executor.finish().map(|(evm, result)| (evm.into_db(), result))
         };
 
+        let instant = Instant::now();
         // Use metered to execute and track timing/gas metrics
         let (mut db, result) = self.metered(|| {
             let res = f();
             let gas_used = res.as_ref().map(|r| r.1.gas_used).unwrap_or(0);
             (gas_used, res)
         })?;
+        let elapsed = instant.elapsed();
+        tracing::debug!("transaction executed, elapsed: {elapsed:?}");
 
         // merge transitions into bundle state
         db.borrow_mut().merge_transitions(BundleRetention::Reverts);
         let output = BlockExecutionOutput { result, state: db.borrow_mut().take_bundle() };
 
-        // Update the metrics for the number of accounts, storage slots and bytecodes updated
-        let accounts = output.state.state.len();
-        let storage_slots =
-            output.state.state.values().map(|account| account.storage.len()).sum::<usize>();
-        let bytecodes = output.state.contracts.len();
+        let revert_elapsed = instant.elapsed();
+        tracing::debug!("merge_transitions done, elapsed: {revert_elapsed:?}");
 
-        self.executor.accounts_updated_histogram.record(accounts as f64);
-        self.executor.storage_slots_updated_histogram.record(storage_slots as f64);
-        self.executor.bytecodes_updated_histogram.record(bytecodes as f64);
+        // Update the metrics for the number of accounts, storage slots and bytecodes updated
+        // let accounts = output.state.state.len();
+        // let storage_slots =
+        //     output.state.state.values().map(|account| account.storage.len()).sum::<usize>();
+        // let bytecodes = output.state.contracts.len();
+
+        // self.executor.accounts_updated_histogram.record(accounts as f64);
+        // self.executor.storage_slots_updated_histogram.record(storage_slots as f64);
+        // self.executor.bytecodes_updated_histogram.record(bytecodes as f64);
 
         Ok(output)
     }

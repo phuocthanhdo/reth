@@ -620,8 +620,7 @@ where
             handle.iter_transactions().map(|res| res.map_err(BlockExecutionError::other)),
             state_hook,
         )?;
-        let execution_finish = Instant::now();
-        let execution_time = execution_finish.duration_since(execution_start);
+        let execution_time = execution_start.elapsed();
         debug!(target: "engine::tree::payload_validator", elapsed = ?execution_time, "Executed block");
         Ok(output)
     }
