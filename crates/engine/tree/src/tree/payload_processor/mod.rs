@@ -139,7 +139,7 @@ where
             execution_cache: Default::default(),
             trie_metrics: Default::default(),
             cross_block_cache_size: config.cross_block_cache_size(),
-            disable_transaction_prewarming: config.disable_prewarming(),
+            disable_transaction_prewarming: true,
             evm_config,
             precompile_cache_disabled: config.precompile_cache_disabled(),
             precompile_cache_map,
@@ -340,6 +340,7 @@ where
         P: BlockReader + StateProviderFactory + StateReader + Clone + 'static,
     {
         if self.disable_transaction_prewarming {
+            tracing::debug!("disable prewarming!");
             // if no transactions should be executed we clear them but still spawn the task for
             // caching updates
             transactions = mpsc::channel().1;
